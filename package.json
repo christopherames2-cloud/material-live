@@ -1,0 +1,33 @@
+{
+  "name": "materialive",
+  "version": "1.0.0",
+  "description": "MateriaLive - Warehouse Inventory & Delivery Tracking System",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "next": "^14.0.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "better-sqlite3": "^9.2.2",
+    "bcryptjs": "^2.4.3",
+    "uuid": "^9.0.0",
+    "qrcode": "^1.5.3",
+    "signature_pad": "^4.1.7",
+    "jspdf": "^2.5.1",
+    "date-fns": "^3.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "@types/better-sqlite3": "^7.6.8",
+    "@types/bcryptjs": "^2.4.6",
+    "@types/uuid": "^9.0.7",
+    "@types/qrcode": "^1.5.5",
+    "typescript": "^5.0.0"
+  }
+}
