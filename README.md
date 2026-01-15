@@ -15,12 +15,6 @@ A cloud-based application for tracking incoming materials, managing staging loca
 
 ## Default Users
 
-| Username | PIN  | Role      | Description            |
-|----------|------|-----------|------------------------|
-| TSTEPPAN | 5668 | warehouse | Tim Steppan            |
-| FGILIC   | 4214 | warehouse | Faton Gilic            |
-| CAMES    | 7902 | admin     | Chris Ames (Admin)     |
-| FIELD    | 1234 | field     | Field User (View Only) |
 
 ## Quick Start
 
