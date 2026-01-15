@@ -1,8 +1,28 @@
 import Database from 'better-sqlite3';
 import bcrypt from 'bcryptjs';
 import path from 'path';
+import fs from 'fs';
 
-const DB_PATH = process.env.DB_PATH || path.join(process.cwd(), 'materialive.db');
+// Use /tmp for cloud environments (DigitalOcean App Platform has read-only filesystem)
+const getDbPath = () => {
+  if (process.env.DB_PATH) {
+    return process.env.DB_PATH;
+  }
+  
+  // Check if we're in a cloud environment with read-only filesystem
+  const cwdPath = path.join(process.cwd(), 'materialive.db');
+  try {
+    // Try to write to cwd
+    fs.accessSync(process.cwd(), fs.constants.W_OK);
+    return cwdPath;
+  } catch {
+    // Fall back to /tmp
+    console.log('Using /tmp for database (read-only filesystem detected)');
+    return '/tmp/materialive.db';
+  }
+};
+
+const DB_PATH = getDbPath();
 
 let db: Database.Database | null = null;
 
@@ -283,6 +303,69 @@ function initializeDatabase(database: Database.Database) {
   }
 }
 
+// JWT Secret - in production, use environment variable
+const JWT_SECRET = process.env.JWT_SECRET || 'materialive-secret-key-change-in-production';
+
+// Simple JWT implementation (no external dependency)
+function base64UrlEncode(str: string): string {
+  return Buffer.from(str).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+}
+
+function base64UrlDecode(str: string): string {
+  str = str.replace(/-/g, '+').replace(/_/g, '/');
+  while (str.length % 4) str += '=';
+  return Buffer.from(str, 'base64').toString();
+}
+
+function createJWT(payload: any, expiresInHours: number = 24): string {
+  const header = { alg: 'HS256', typ: 'JWT' };
+  const now = Math.floor(Date.now() / 1000);
+  const tokenPayload = {
+    ...payload,
+    iat: now,
+    exp: now + (expiresInHours * 60 * 60)
+  };
+  
+  const headerB64 = base64UrlEncode(JSON.stringify(header));
+  const payloadB64 = base64UrlEncode(JSON.stringify(tokenPayload));
+  
+  const crypto = require('crypto');
+  const signature = crypto.createHmac('sha256', JWT_SECRET)
+    .update(`${headerB64}.${payloadB64}`)
+    .digest('base64')
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+  
+  return `${headerB64}.${payloadB64}.${signature}`;
+}
+
+function verifyJWT(token: string): { valid: boolean; payload?: any } {
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return { valid: false };
+    
+    const [headerB64, payloadB64, signature] = parts;
+    
+    const crypto = require('crypto');
+    const expectedSig = crypto.createHmac('sha256', JWT_SECRET)
+      .update(`${headerB64}.${payloadB64}`)
+      .digest('base64')
+      .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+    
+    if (signature !== expectedSig) return { valid: false };
+    
+    const payload = JSON.parse(base64UrlDecode(payloadB64));
+    
+    // Check expiration
+    if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) {
+      return { valid: false };
+    }
+    
+    return { valid: true, payload };
+  } catch {
+    return { valid: false };
+  }
+}
+
 // Auth functions
 export function authenticateUser(username: string, pin: string): { success: boolean; user?: any; token?: string; error?: string } {
   const database = getDb();
@@ -296,13 +379,20 @@ export function authenticateUser(username: string, pin: string): { success: bool
     return { success: false, error: 'Invalid PIN' };
   }
 
-  // Generate session token
-  const { v4: uuidv4 } = require('uuid');
-  const token = uuidv4();
-  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(); // 24 hours
+  // Generate JWT token (no database session needed)
+  const token = createJWT({
+    id: user.id,
+    username: user.username,
+    fullName: user.full_name,
+    role: user.role
+  });
 
-  database.prepare('INSERT INTO sessions (user_id, token, expires_at) VALUES (?, ?, ?)').run(user.id, token, expiresAt);
-  database.prepare('UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?').run(user.id);
+  // Update last login
+  try {
+    database.prepare('UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?').run(user.id);
+  } catch (e) {
+    // Ignore if db is read-only
+  }
 
   return {
     success: true,
@@ -317,32 +407,26 @@ export function authenticateUser(username: string, pin: string): { success: bool
 }
 
 export function validateSession(token: string): { valid: boolean; user?: any } {
-  const database = getDb();
-  const session = database.prepare(`
-    SELECT s.*, u.id as user_id, u.username, u.full_name, u.role 
-    FROM sessions s 
-    JOIN users u ON s.user_id = u.id 
-    WHERE s.token = ? AND datetime(s.expires_at) > datetime('now') AND u.active = 1
-  `).get(token) as any;
-
-  if (!session) {
+  const result = verifyJWT(token);
+  
+  if (!result.valid || !result.payload) {
     return { valid: false };
   }
 
   return {
     valid: true,
     user: {
-      id: session.user_id,
-      username: session.username,
-      fullName: session.full_name,
-      role: session.role
+      id: result.payload.id,
+      username: result.payload.username,
+      fullName: result.payload.fullName,
+      role: result.payload.role
     }
   };
 }
 
 export function logoutSession(token: string): void {
-  const database = getDb();
-  database.prepare('DELETE FROM sessions WHERE token = ?').run(token);
+  // JWT tokens are stateless - logout is handled client-side by removing the token
+  // Nothing to do server-side
 }
 
 export default getDb;
