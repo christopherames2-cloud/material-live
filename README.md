@@ -15,13 +15,6 @@ A cloud-based application for tracking incoming materials, managing staging loca
 
 ## Default Users
 
-| Username | PIN  | Role      | Description            |
-|----------|------|-----------|------------------------|
-| TSTEPPAN | 5668 | warehouse | Tim Steppan            |
-| FGILIC   | 4214 | warehouse | Faton Gilic            |
-| CAMES    | 7902 | admin     | Chris Ames (Admin)     |
-| FIELD    | 1234 | field     | Field User (View Only) |
-
 ## Quick Start
 
 ### Prerequisites
@@ -130,8 +123,6 @@ The Local Agent will:
 - **jcjobattachment** - Job Attachments (for signed slips)
 
 ### Attachment Path
-
-Signed slips sync to: `\\ceserver\ComputerEase\data\0\jc\job.att\Material Documents\`
 
 File naming: `[FORMSITE_ID] [YYMMDD] [SEQUENCE] [INITIAL+LASTNAME].pdf`
 Example: `23677908 251106 001 CAMES.pdf`
